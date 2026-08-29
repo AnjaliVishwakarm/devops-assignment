@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ember — Focus Timer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --ink: #EFE9E0;
+    --ink-dim: #A69C8D;
+    --bg-1: #1B1815;
+    --bg-2: #221E19;
+    --ember: #E08A3E;
+    --ember-dim: #6B4A28;
+    --ring-track: #33291F;
+    --focus-outline: #E08A3E;
+  }
+
+  *{ box-sizing: border-box; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  html, body{
+    height: 100%;
+    margin: 0;
+    background: radial-gradient(120% 120% at 50% -10%, var(--bg-2), var(--bg-1) 60%);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .app{
+    width: 100%;
+    max-width: 420px;
+    padding: 48px 32px 40px;
+    text-align: center;
+  }
+
+  .eyebrow{
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 6px;
+  }
+
+  h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: 0.01em;
+    margin: 0 0 40px;
+    color: var(--ink);
+  }
+  h1 span{ color: var(--ember); font-style: italic; font-weight: 300; }
+
+  .dial-wrap{
+    position: relative;
+    width: 280px;
+    height: 280px;
+    margin: 0 auto 36px;
+  }
+
+  svg{ width: 100%; height: 100%; transform: rotate(-90deg); }
+
+  .track{
+    fill: none;
+    stroke: var(--ring-track);
+    stroke-width: 3;
+  }
+
+  .progress{
+    fill: none;
+    stroke: var(--ember);
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear;
+    filter: drop-shadow(0 0 6px rgba(224,138,62,0.45));
+  }
+
+  .tick{
+    stroke: var(--ember-dim);
+    stroke-width: 1.5;
+  }
+
+  .dial-face{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .time{
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 64px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  .mode-label{
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  .modes{
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+
+  .mode-btn{
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    background: transparent;
+    border: 1px solid var(--ember-dim);
+    border-radius: 999px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  .mode-btn:hover{ border-color: var(--ember); color: var(--ink); }
+  .mode-btn.active{
+    background: var(--ember);
+    border-color: var(--ember);
+    color: #1B1815;
+    font-weight: 600;
+  }
+  .mode-btn:focus-visible{ outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+
+  .controls{
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .btn{
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 13px 30px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.2s ease;
+  }
+  .btn:active{ transform: scale(0.96); }
+  .btn:focus-visible{ outline: 2px solid var(--focus-outline); outline-offset: 2px; }
+
+  .btn-primary{
+    background: var(--ember);
+    color: #1B1815;
+  }
+  .btn-primary:hover{ opacity: 0.9; }
+
+  .btn-ghost{
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--ember-dim);
+  }
+  .btn-ghost:hover{ color: var(--ink); border-color: var(--ember); }
+
+  .sessions{
+    margin-top: 32px;
+    font-size: 12px;
+    color: var(--ink-dim);
+    letter-spacing: 0.04em;
+  }
+  .ember-dot{
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ember-dim);
+    margin: 0 3px;
+    transition: background 0.3s ease;
+  }
+  .ember-dot.lit{ background: var(--ember); box-shadow: 0 0 6px rgba(224,138,62,0.6); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <p class="eyebrow">A quiet fire</p>
+  <h1>Ember <span>focus timer</span></h1>
+
+  <div class="modes">
+    <button class="mode-btn active" data-mins="25" data-label="Focus">Focus · 25</button>
+    <button class="mode-btn" data-mins="5" data-label="Short Rest">Rest · 5</button>
+    <button class="mode-btn" data-mins="15" data-label="Long Rest">Rest · 15</button>
+  </div>
+
+  <div class="dial-wrap">
+    <svg viewBox="0 0 280 280">
+      <circle class="track" cx="140" cy="140" r="124"></circle>
+      <circle class="progress" id="progress" cx="140" cy="140" r="124"
+        stroke-dasharray="779" stroke-dashoffset="0"></circle>
+    </svg>
+    <div class="dial-face">
+      <div class="time" id="time">25:00</div>
+      <div class="mode-label" id="modeLabel">Focus</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="startPause">Begin</button>
+    <button class="btn btn-ghost" id="reset">Reset</button>
+  </div>
+
+  <div class="sessions" id="sessions">
+    <span class="ember-dot"></span><span class="ember-dot"></span><span class="ember-dot"></span><span class="ember-dot"></span>
+    &nbsp; sessions today
+  </div>
+</div>
+
+<script>
+  const CIRC = 2 * Math.PI * 124;
+  const progressEl = document.getElementById('progress');
+  const timeEl = document.getElementById('time');
+  const modeLabelEl = document.getElementById('modeLabel');
+  const startPauseBtn = document.getElementById('startPause');
+  const resetBtn = document.getElementById('reset');
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  const dots = document.querySelectorAll('.ember-dot');
+
+  progressEl.style.strokeDasharray = CIRC;
+
+  let totalSeconds = 25 * 60;
+  let remaining = totalSeconds;
+  let running = false;
+  let timerId = null;
+  let completedSessions = 0;
+  let currentMode = 'Focus';
+
+  function render(){
+    const m = Math.floor(remaining / 60).toString().padStart(2,'0');
+    const s = (remaining % 60).toString().padStart(2,'0');
+    timeEl.textContent = `${m}:${s}`;
+    const fraction = remaining / totalSeconds;
+    progressEl.style.strokeDashoffset = CIRC * (1 - fraction);
+  }
+
+  function tick(){
+    if(remaining > 0){
+      remaining--;
+      render();
+    } else {
+      pause();
+      if(currentMode === 'Focus'){
+        completedSessions = Math.min(completedSessions + 1, dots.length);
+        dots.forEach((d, i) => d.classList.toggle('lit', i < completedSessions));
+      }
+      startPauseBtn.textContent = 'Begin';
+    }
+  }
+
+  function start(){
+    running = true;
+    startPauseBtn.textContent = 'Pause';
+    timerId = setInterval(tick, 1000);
+  }
+
+  function pause(){
+    running = false;
+    startPauseBtn.textContent = 'Resume';
+    clearInterval(timerId);
+  }
+
+  startPauseBtn.addEventListener('click', () => {
+    if(running){ pause(); startPauseBtn.textContent = 'Resume'; }
+    else { start(); }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    pause();
+    remaining = totalSeconds;
+    render();
+    startPauseBtn.textContent = 'Begin';
+  });
+
+  modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      modeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      pause();
+      const mins = parseInt(btn.dataset.mins, 10);
+      currentMode = btn.dataset.label;
+      totalSeconds = mins * 60;
+      remaining = totalSeconds;
+      modeLabelEl.textContent = currentMode;
+      render();
+      startPauseBtn.textContent = 'Begin';
+    });
+  });
+
+  render();
+</script>
+
+</body>
+</html>

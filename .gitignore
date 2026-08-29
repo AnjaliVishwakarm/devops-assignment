@@ -1,0 +1,19 @@
+# Terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/*.tfplan
+**/crash.log
+
+# Terraform lock file
+# Keep this file in Git
+# .terraform.lock.hcl should NOT be ignored
+
+# Secrets
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
