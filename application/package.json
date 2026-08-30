@@ -1,0 +1,8 @@
+{
+  "name": "ember-focus-timer",
+  "version": "1.0.0",
+  "description": "Ember Focus Timer",
+  "scripts": {
+    "test": "node tests/app.test.js"
+  }
+}

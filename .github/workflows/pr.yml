@@ -1,0 +1,61 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: application
+        run: npm install
+
+      - name: Run unit tests
+        working-directory: application
+        run: npm test
+
+      - name: Build Docker image
+        working-directory: application
+        run: docker build -t ember-app:test .
+
+      - name: Start application container
+        run: |
+          docker run -d \
+            --name ember-test \
+            -p 8080:80 \
+            ember-app:test
+
+          sleep 5
+
+      - name: Run integration test
+        run: |
+          curl --fail http://localhost:8080/
+          curl --fail http://localhost:8080/ | grep "Ember"
+
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ember-app:test
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop ember-test || true
+          docker rm ember-test || true
