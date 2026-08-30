@@ -15,11 +15,16 @@ env:
 
 jobs:
 
+  # --------------------------------------------------
+  # Build, Test, Scan and Push Docker Image
+  # --------------------------------------------------
+
   build-and-push:
     name: Build, Scan and Push
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -65,52 +70,73 @@ jobs:
             $IMAGE_NAME:${{ github.sha }}
 
 
-deploy-staging:
-  name: Deploy to Staging
-  needs: build-and-push
-  runs-on: ubuntu-latest
+  # --------------------------------------------------
+  # Deploy to Staging EC2
+  # --------------------------------------------------
 
-  env:
-    STAGING_INSTANCE_ID: ${{ vars.STAGING_INSTANCE_ID }}
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
 
-  steps:
+    env:
+      STAGING_INSTANCE_ID: ${{ vars.STAGING_INSTANCE_ID }}
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-        aws-region: us-east-1
+    steps:
 
-    - name: Verify staging instance
-      run: |
-        echo "Staging Instance ID: $STAGING_INSTANCE_ID"
+      # -----------------------------------------------
+      # Configure AWS using GitHub OIDC
+      # -----------------------------------------------
 
-        aws ec2 describe-instances \
-          --instance-ids "$STAGING_INSTANCE_ID" \
-          --region us-east-1 \
-          --query "Reservations[].Instances[].InstanceId" \
-          --output text
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
 
-    - name: Deploy application to staging
-      run: |
-        COMMAND_ID=$(aws ssm send-command \
-          --instance-ids "$STAGING_INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --parameters 'commands=[
-            "docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}",
-            "docker stop ember-app || true",
-            "docker rm ember-app || true",
-            "docker run -d --name ember-app --restart unless-stopped -p 80:80 ${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          ]' \
-          --query "Command.CommandId" \
-          --output text)
+      # -----------------------------------------------
+      # Verify that GitHub received the EC2 ID
+      # -----------------------------------------------
 
-        echo "SSM Command ID: $COMMAND_ID"
+      - name: Verify staging instance
+        run: |
+          echo "Staging Instance ID: $STAGING_INSTANCE_ID"
 
-        aws ssm wait command-executed \
-          --command-id "$COMMAND_ID" \
-          --instance-id "$STAGING_INSTANCE_ID"
+          aws ec2 describe-instances \
+            --instance-ids "$STAGING_INSTANCE_ID" \
+            --region us-east-1 \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text
 
-    - name: Verify staging deployment
-      run: |
-        echo "Staging deployment completed successfully."
+      # -----------------------------------------------
+      # Deploy application using AWS Systems Manager
+      # -----------------------------------------------
+
+      - name: Deploy application to staging
+        run: |
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$STAGING_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}",
+              "docker stop ember-app || true",
+              "docker rm ember-app || true",
+              "docker run -d --name ember-app --restart unless-stopped -p 80:80 ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$STAGING_INSTANCE_ID"
+
+      # -----------------------------------------------
+      # Final deployment confirmation
+      # -----------------------------------------------
+
+      - name: Verify staging deployment
+        run: |
+          echo "Staging deployment completed successfully."
