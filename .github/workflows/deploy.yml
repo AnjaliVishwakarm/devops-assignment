@@ -65,39 +65,52 @@ jobs:
             $IMAGE_NAME:${{ github.sha }}
 
 
-  deploy-staging:
-    name: Deploy to Staging
-    needs: build-and-push
-    runs-on: ubuntu-latest
+deploy-staging:
+  name: Deploy to Staging
+  needs: build-and-push
+  runs-on: ubuntu-latest
 
-    steps:
+  env:
+    STAGING_INSTANCE_ID: ${{ vars.STAGING_INSTANCE_ID }}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ap-south-1
+  steps:
 
-      - name: Deploy application to staging
-        run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "${{ vars.STAGING_INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --parameters 'commands=[
-              "docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}",
-              "docker stop ember-app || true",
-              "docker rm ember-app || true",
-              "docker run -d --name ember-app --restart unless-stopped -p 80:80 ${{ env.IMAGE_NAME }}:${{ github.sha }}"
-            ]' \
-            --query "Command.CommandId" \
-            --output text)
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        aws-region: us-east-1
 
-          echo "SSM Command ID: $COMMAND_ID"
+    - name: Verify staging instance
+      run: |
+        echo "Staging Instance ID: $STAGING_INSTANCE_ID"
 
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id "${{ vars.STAGING_INSTANCE_ID }}"
+        aws ec2 describe-instances \
+          --instance-ids "$STAGING_INSTANCE_ID" \
+          --region us-east-1 \
+          --query "Reservations[].Instances[].InstanceId" \
+          --output text
 
-      - name: Verify staging deployment
-        run: |
-          echo "Staging deployment completed successfully."
+    - name: Deploy application to staging
+      run: |
+        COMMAND_ID=$(aws ssm send-command \
+          --instance-ids "$STAGING_INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --parameters 'commands=[
+            "docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}",
+            "docker stop ember-app || true",
+            "docker rm ember-app || true",
+            "docker run -d --name ember-app --restart unless-stopped -p 80:80 ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          ]' \
+          --query "Command.CommandId" \
+          --output text)
+
+        echo "SSM Command ID: $COMMAND_ID"
+
+        aws ssm wait command-executed \
+          --command-id "$COMMAND_ID" \
+          --instance-id "$STAGING_INSTANCE_ID"
+
+    - name: Verify staging deployment
+      run: |
+        echo "Staging deployment completed successfully."
