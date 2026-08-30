@@ -1,4 +1,4 @@
-name: Build and Publish
+name: Build, Publish and Deploy
 
 on:
   push:
@@ -8,11 +8,13 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 env:
   IMAGE_NAME: ghcr.io/anjalivishwakarm/devops-assignment
 
 jobs:
+
   build-and-push:
     name: Build, Scan and Push
     runs-on: ubuntu-latest
@@ -44,7 +46,7 @@ jobs:
       - name: Scan Docker image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ghcr.io/anjalivishwakarm/devops-assignment:${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: table
           exit-code: "1"
           ignore-unfixed: true
@@ -61,3 +63,41 @@ jobs:
         run: |
           docker push \
             $IMAGE_NAME:${{ github.sha }}
+
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - name: Deploy application to staging
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ vars.STAGING_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "docker pull ${{ env.IMAGE_NAME }}:${{ github.sha }}",
+              "docker stop ember-app || true",
+              "docker rm ember-app || true",
+              "docker run -d --name ember-app --restart unless-stopped -p 80:80 ${{ env.IMAGE_NAME }}:${{ github.sha }}"
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ vars.STAGING_INSTANCE_ID }}"
+
+      - name: Verify staging deployment
+        run: |
+          echo "Staging deployment completed successfully."
