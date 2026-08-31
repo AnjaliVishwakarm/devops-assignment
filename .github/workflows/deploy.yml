@@ -325,8 +325,13 @@ jobs:
             --query "Command.CommandId" \
             --output text
 
+    # ==================================================
+  # FAILURE EMAIL NOTIFICATION
+  # ==================================================
+
   notify-failure:
     name: Notify on Failure
+
     if: ${{ always() && (needs.build-and-push.result == 'failure' || needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure') }}
 
     needs:
@@ -348,6 +353,7 @@ jobs:
         env:
           FROM_EMAIL: ${{ secrets.SES_FROM_EMAIL }}
           TO_EMAIL: ${{ secrets.SES_TO_EMAIL }}
+
         run: |
           aws ses send-email \
             --region us-east-1 \
@@ -356,10 +362,10 @@ jobs:
             --subject "CI/CD Pipeline Failed - ${{ github.repository }}" \
             --text "CI/CD pipeline failure detected.
 
-Repository: ${{ github.repository }}
-Branch: ${{ github.ref_name }}
-Commit: ${{ github.sha }}
-Workflow: ${{ github.workflow }}
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Workflow: ${{ github.workflow }}
 
-Please check the GitHub Actions run:
-https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"          
+          Please check the GitHub Actions run:
+          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
