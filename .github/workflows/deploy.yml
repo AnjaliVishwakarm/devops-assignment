@@ -328,6 +328,15 @@ jobs:
     # ==================================================
   # FAILURE EMAIL NOTIFICATION
   # ==================================================
+  test-failure:
+    name: Test Failure notification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Simulate failure
+        run: |
+          echo "Testing SES failure notification"
+          exit 1
 
   notify-failure:
     name: Notify on Failure
