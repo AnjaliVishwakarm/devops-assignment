@@ -328,6 +328,15 @@ jobs:
     # ==================================================
   # FAILURE EMAIL NOTIFICATION
   # ==================================================
+  test-failure:
+    name: Test Failure notification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Simulate failure
+        run: |
+          echo "Testing SES failure notification"
+          exit 1
 
   notify-failure:
     name: Notify on Failure
@@ -338,60 +347,6 @@ jobs:
       - build-and-push
       - deploy-staging
       - deploy-production
-
-    runs-on: ubuntu-latest
-
-    steps:
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: us-east-1
-
-      - name: Send failure email
-        env:
-          FROM_EMAIL: ${{ secrets.SES_FROM_EMAIL }}
-          TO_EMAIL: ${{ secrets.SES_TO_EMAIL }}
-
-        run: |
-          aws ses send-email \
-            --region us-east-1 \
-            --from "$FROM_EMAIL" \
-            --destination "ToAddresses=$TO_EMAIL" \
-            --subject "CI/CD Pipeline Failed - ${{ github.repository }}" \
-            --text "CI/CD pipeline failure detected.
-
-          Repository: ${{ github.repository }}
-          Branch: ${{ github.ref_name }}
-          Commit: ${{ github.sha }}
-          Workflow: ${{ github.workflow }}
-
-          Please check the GitHub Actions run:
-          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-
-  test-failure:
-    name: Test Failure Notification
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Simulate failure
-        run: |
-          echo "Testing SES failure notification"
-          exit 1
-
-
-  notify-failure:
-    name: Notify on Failure
-
-    if: ${{ always() && (needs.build-and-push.result == 'failure' || needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure' || needs.test-failure.result == 'failure') }}
-
-    needs:
-      - build-and-push
-      - deploy-staging
-      - deploy-production
-      - test-failure
 
     runs-on: ubuntu-latest
 
